@@ -1,3 +1,12 @@
+/* C++ program to calculate biggest island by area islands in a given matrix
+1 represents a grid of land, 0 represents a grid of water
+
+110001101
+001110100
+111010000
+
+*/
+
 class Islands{
 int maxArea=0;
 vector<vector<int>> ilands;
