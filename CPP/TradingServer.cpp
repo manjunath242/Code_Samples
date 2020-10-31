@@ -8,19 +8,19 @@ MODIFY order_id SELL 2000 100
 CANCEL order_id
 PRINT
 */
+
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+#include <sstream>
 #include <iostream>
-#include<vector>
-#include<queue>
-#include<stack>
-#include<set>
-#include<string>
-#include<map>
-#include<sstream>
+#include <algorithm>
 
 using namespace std;
 
-enum ordername { BUY, SELL};
-enum ordertype {GFD, IOC};
+enum ordername { BUY, SELL };
+enum ordertype { GFD, IOC };
 
 class order {
 
@@ -32,7 +32,7 @@ class order {
 
 public:
 
-	order(string _orderId, ordername _oName, ordertype _oType,	int _quantity, int _price)
+	order(string _orderId, ordername _oName, ordertype _oType, int _quantity, int _price)
 		:orderId(_orderId), oName(_oName), oType(_oType), quantity(_quantity), price(_price)
 	{
 	}
@@ -41,7 +41,7 @@ public:
 	{
 	}
 
-	~order() 
+	~order()
 	{
 	}
 
@@ -102,9 +102,55 @@ class orderBook {
 public:
 	map<string, order> orderTracker;
 
+	void debugPrint()
+	{
+		cout << "-------------------DEBUG DATA---------------" << endl;
+
+		cout << "All orders:" << endl;
+		for (auto it = orderTracker.begin();it != orderTracker.end();it++)
+		{
+			cout << it->first << " ";
+		}
+		cout << endl << endl;
+
+		cout << "buy bids:" << endl;
+		for (auto it = buyBids.begin();it != buyBids.end();it++)
+		{
+			cout << *it << " ";
+		}
+		cout << endl << endl;
+
+		cout << "sell bids:" << endl;
+		for (auto it = sellBids.begin();it != sellBids.end();it++)
+		{
+			cout << *it << " ";
+		}
+		cout << endl << endl;
+
+		cout << "buy bids tracker:" << endl;
+		for (auto it = buyBidTracker.begin();it != buyBidTracker.end();it++)
+		{
+			for (int i = 0;i < it->second.size();i++)
+				cout << it->second[i] << " ";
+			cout << endl;
+		}
+		cout << endl << endl;
+
+		cout << "sell bids tracker:" << endl;
+		for (auto it = sellBidTracker.begin();it != sellBidTracker.end();it++)
+		{
+			for (int i = 0;i < it->second.size();i++)
+				cout << it->second[i] << " ";
+			cout << endl;
+		}
+		cout << endl << endl;
+
+		cout << "-------------------DEBUG DATA---------------" << endl;
+	}
+
 	order* getOrderbyId(string orderId)
 	{
-		order* o=nullptr;
+		order* o = nullptr;
 		if (orderTracker.count(orderId)>0)
 		{
 			o = &orderTracker[orderId];
@@ -115,54 +161,60 @@ public:
 
 	void makeEntry(order &o)
 	{
-		if (o.getOrderName() == BUY)
+		if (orderTracker.count(o.getOrderId()) == 0)
 		{
-			processAndEntry(o, buyBidTracker, buyBids);
-		}
-		else if (o.getOrderName() == SELL)
-		{
-			processAndEntry(o, sellBidTracker,sellBids);
+			if (o.getOrderName() == BUY)
+			{
+				processAndEntry(o, buyBidTracker, buyBids);
+			}
+			else if (o.getOrderName() == SELL)
+			{
+				processAndEntry(o, sellBidTracker, sellBids);
+			}
 		}
 	}
 
 	void removeEntry(order *o)
 	{
-		if (o->getOrderName() == BUY)
+		if (orderTracker.count(o->getOrderId()) > 0)
 		{
-			processRemoveEntry(o, buyBidTracker,buyBids);
-		}
-		else if (o->getOrderName() == SELL)
-		{
-			processRemoveEntry(o, sellBidTracker,sellBids);
+			if (o->getOrderName() == BUY)
+			{
+				processRemoveEntry(o, buyBidTracker, buyBids);
+			}
+			else if (o->getOrderName() == SELL)
+			{
+				processRemoveEntry(o, sellBidTracker, sellBids);
+			}
 		}
 	}
 
 	void printOrderBook()
 	{
 		//Print sellorders
+		cout << "SELL:" << endl;
 		for (auto item : sellBids)
 		{
 			int quantity = 0;
-			cout << "SELL:" << endl;
 			vector<string> tempOrderList = sellBidTracker[item];
 			for (int j = 0;j < tempOrderList.size();j++)
 			{
 				quantity = quantity + orderTracker[tempOrderList[j]].getQuantity();
 			}
-			cout << item << " " << quantity;
+			cout << item << " " << quantity << endl;;
 		}
 
 		//Print buy orders
+		cout << "BUY:" << endl;
 		for (auto item : buyBids)
 		{
 			int quantity = 0;
-			cout << "BUY:" << endl;
 			vector<string> tempOrderList = buyBidTracker[item];
 			for (int j = 0;j < tempOrderList.size();j++)
 			{
 				quantity = quantity + orderTracker[tempOrderList[j]].getQuantity();
 			}
-			cout << item << " " << quantity;
+			cout << item << " " << quantity << endl;
 		}
 
 	}
@@ -192,141 +244,156 @@ private:
 
 	void processRemoveEntry(order *o, map<int, vector<string> > &bidTracker, set<int> &bids)
 	{
-		// remove from orders map
-		if (orderTracker.count(o->getOrderId()) > 0)
+
+		//remove from bids and bidsmap
+		if (bidTracker.count(o->getPrice()) > 0)
 		{
-			orderTracker.erase(o->getOrderId());
+			//get all siblings orderat same price
+			vector<string> ordersAtPrice = bidTracker[o->getPrice()];
 
-			//remove from bids and bidsmap
-			if (bidTracker.count(o->getPrice()) > 0)
+			if (ordersAtPrice.size() > 0)
 			{
-				//get all siblings orderat same price
-				vector<string> ordersAtPrice = bidTracker[o->getPrice()];
+				auto it = find(ordersAtPrice.begin(), ordersAtPrice.end(), o->getOrderId());
+				ordersAtPrice.erase(it);
+				bidTracker[o->getPrice()] = ordersAtPrice;
 
-				if (ordersAtPrice.size() > 0)
+				//if no siblings order at this price, remove frombids and bidsmap
+				if (ordersAtPrice.size() == 0)
 				{
-					auto it = find(ordersAtPrice.begin(), ordersAtPrice.end(), o->getOrderId());
-					ordersAtPrice.erase(it);
-					bidTracker[o->getPrice()] = ordersAtPrice;
-
-					//if no siblings order at this price, remove frombids and bidsmap
-					if (ordersAtPrice.size() == 0)
-					{
-						bidTracker.erase(o->getPrice());
-						bids.erase(o->getPrice());
-					}
+					bidTracker.erase(o->getPrice());
+					bids.erase(o->getPrice());
 				}
 			}
 		}
+
+		// remove from orders map
+		orderTracker.erase(o->getOrderId());
+
 	}
 
 	void processOrderIfTradable(order &o)
 	{
 		int currentOrderPrice = o.getPrice();
 
-		if (o.getOrderType() == BUY)
+		if (o.getOrderName() == BUY)
 		{
 			// if no seller at this price return
-			if (*sellBids.begin() >currentOrderPrice) return;
-
-			else //trade possible
+			if (sellBids.size() > 0)
 			{
-				set<int> sellBidsTemp = sellBids;
-				auto it = sellBids.begin();
+				if (*sellBids.begin() > currentOrderPrice) return;
 
-				while (it != sellBids.end())
+				else //trade possible
 				{
-					//if no sell price below current buy price, or when complete trade -exit
-					if ((*it > currentOrderPrice) || (o.getQuantity()==0)) break;
+					set<int> sellBidsTemp = sellBids;
+					auto it = sellBids.begin();
 
-					vector<string> NewOrderList = processOrderList(o, *it);
+					while (it != sellBids.end())
+					{
+						//if no sell price below current buy price, or when complete trade -exit
+						if ((*it > currentOrderPrice) || (o.getQuantity() == 0)) break;
 
-					if (NewOrderList.size()>0)
-					{
-						sellBidTracker[*it] = NewOrderList;
+						vector<string> OrderList = sellBidTracker[*it];
+						//try to process matching orders at this price
+						OrderList = processOrderList(o, *it, OrderList);
+
+						if (OrderList.size() > 0)
+						{
+							sellBidTracker[*it] = OrderList;
+						}
+						else
+						{
+							//remove entry from sellBidTracker
+							sellBidTracker.erase(*it);
+							sellBidsTemp.erase(*it);
+						}
+						it++;
 					}
-					else
-					{
-						//remove entry from sellBidTracker
-						sellBidsTemp.erase(*it);
-					}
-					it++;
+
+					sellBids = sellBidsTemp;
 				}
-
-				sellBids = sellBidsTemp;
 			}
 		}
 
-		else if (o.getOrderType() == SELL)
+		else if (o.getOrderName() == SELL)
 		{
 			// if no buyers at this price return
-			if (*buyBids.begin() < currentOrderPrice) return;
-			else //trade possible
+			if (buyBids.size() > 0)
 			{
-				set<int> buyBidsTemp = buyBids;
-				auto it = buyBids.rbegin();
-
-				while (it != buyBids.rend())
+				if (*buyBids.begin() < currentOrderPrice) return;
+				else //trade possible
 				{
-					//if no buy price above current buy price, or when complete trade -exit
-					if ((*it < currentOrderPrice) || (o.getQuantity() == 0)) break;
+					set<int> buyBidsTemp = buyBids;
+					auto it = buyBids.rbegin();
 
-					//try to process matching orders at this price
-					vector<string> NewOrderList =processOrderList(o, *it);
-
-					if (NewOrderList.size()>0)
+					while (it != buyBids.rend())
 					{
-						sellBidTracker[*it] = NewOrderList;
-					}
-					else
-					{
-						//remove entry from sellBidTracker
-						buyBidsTemp.erase(*it);
-					}
+						//if no buy price above current buy price, or when complete trade -exit
+						if ((*it < currentOrderPrice) || (o.getQuantity() == 0)) break;
 
-					it++;
+						vector<string> OrderList = buyBidTracker[*it];
+						//try to process matching orders at this price
+						OrderList = processOrderList(o, *it, OrderList);
+
+						if (OrderList.size()>0)
+						{
+							buyBidTracker[*it] = OrderList;
+						}
+						else
+						{
+							//remove entry from buyBidTracker
+							buyBidTracker.erase(*it);
+							buyBidsTemp.erase(*it);
+						}
+
+						it++;
+					}
+					buyBids = buyBidsTemp;
 				}
-				buyBids = buyBidsTemp;
 			}
 		}
 	}
 
-	vector<string> processOrderList(order &o,const int price)
+	vector<string> processOrderList(order &o, const int price, vector<string> orderList)
 	{
-		//get orders with best price for buying
-		vector<string> orderList = sellBidTracker[price];
 		vector<string> orderListModified = orderList;
 
 		for (int i = 0;i <= orderList.size();i++)
 		{
-			order matchingOrder = orderTracker[orderList[i]];
 
-			if (matchingOrder.getQuantity() <= o.getQuantity())
+			if (orderTracker.empty()) break;
+			if ((o.getQuantity() == 0)) break;
+			if (orderTracker.count(orderList[i]) > 0)
 			{
-				//update new quantity to currentorder
-				o.setQuantity(o.getQuantity() - matchingOrder.getQuantity());
-				cout << "TRADE " << matchingOrder.getOrderId()<<" "<<matchingOrder.getPrice() <<" " << matchingOrder.getQuantity() <<" "<< o.getOrderId()<<" "<< o.getPrice()<<" "<< matchingOrder.getQuantity() << endl;
+				order * matchingOrder = &orderTracker[orderList[i]];
 
-				//remove this matching order from book, update quantity of current order
-				orderTracker.erase(orderList[i]);
-				orderListModified.erase(std::remove(orderListModified.begin(), orderListModified.end(), orderList[i]), orderListModified.end());
+				if (matchingOrder->getQuantity() <= o.getQuantity())
+				{
+					//update new quantity to currentorder
+					o.setQuantity(o.getQuantity() - matchingOrder->getQuantity());
+					cout << "TRADE " << matchingOrder->getOrderId() << " " << matchingOrder->getPrice() << " " << matchingOrder->getQuantity() << " " << o.getOrderId() << " " << o.getPrice() << " " << matchingOrder->getQuantity() << endl;
+
+					//remove this matching order from book, update quantity of current order
+					orderTracker.erase(orderList[i]);
+					orderListModified.erase(std::remove(orderListModified.begin(), orderListModified.end(), orderList[i]), orderListModified.end());
+				}
+				else if (matchingOrder->getQuantity() > o.getQuantity())
+				{
+					//update new quantity to matchingtorder
+					matchingOrder->setQuantity(matchingOrder->getQuantity() - o.getQuantity());
+					cout << "TRADE " << matchingOrder->getOrderId() << " " << matchingOrder->getPrice() << " " << o.getQuantity() << " " << o.getOrderId() << " " << o.getPrice() << " " << o.getQuantity() << endl;
+					o.setQuantity(0);
+				}
 			}
-			else if (matchingOrder.getQuantity() > o.getQuantity())
-			{
-				//update new quantity to matchingtorder
-				matchingOrder.setQuantity(matchingOrder.getQuantity() - o.getQuantity());
-				cout << "TRADE " << matchingOrder.getOrderId() << " " << matchingOrder.getPrice() << " " << o.getQuantity() << " " << o.getOrderId() << " " << o.getPrice() << " " << o.getQuantity() << endl;
-				o.setQuantity(0);
-			}
+			else break;
 		}
 
 		return orderListModified;
-	
+
 	}
 
 };
 
-class TradeEngine 
+class TradeEngine
 {
 public:
 	void process()
@@ -334,8 +401,12 @@ public:
 		string line;
 		while (getline(cin, line))
 		{
+			trim(line);
+
 			vector<string> inputMembers = split(line, ' ');
 			processOperation(inputMembers);
+			//printOrderBook();
+			oBook.debugPrint();
 		}
 	}
 
@@ -348,17 +419,19 @@ private:
 		if (inputMembers.size() == 0) return false;
 
 		// if invalid operation
-		if (!((inputMembers[0] == "BUY") || (inputMembers[0] == "SELL") || (inputMembers[0] == "MODIFY") || (inputMembers[0] == "CANCEL")))
+		if (!((inputMembers[0] == "BUY") || (inputMembers[0] == "SELL") || (inputMembers[0] == "MODIFY") || (inputMembers[0] == "CANCEL") || (inputMembers[0] == "PRINT")))
 			return false;
 
 		if (inputMembers[0] == "BUY" || inputMembers[0] == "SELL")
 		{
+			if (inputMembers.size() != 5) return false;
+
 			if (!((inputMembers[1] == "GFD" || inputMembers[1] == "IOC"))) return false;
 			try {
 				int temp = stoi(inputMembers[2]);
 				temp = stoi(inputMembers[3]);
 			}
-			catch(exception e)
+			catch (exception e)
 			{
 				return false;
 			}
@@ -366,6 +439,8 @@ private:
 
 		if (inputMembers[0] == "MODIFY")
 		{
+			if (inputMembers.size() != 5) return false;
+
 			if (!oBook.getOrderbyId(inputMembers[1])) return false;
 			if (!((inputMembers[2] == "BUY" || inputMembers[2] == "SELL"))) return false;
 
@@ -381,7 +456,14 @@ private:
 
 		if (inputMembers[0] == "CANCEL")
 		{
+			if (inputMembers.size() != 2) return false;
+
 			if (!oBook.getOrderbyId(inputMembers[1])) return false;
+		}
+
+		if (inputMembers[0] == "PRINT")
+		{
+			if (inputMembers.size() != 1) return false;
 		}
 
 		return true;
@@ -415,31 +497,8 @@ private:
 		}
 		catch (exception e)
 		{
-			cout << "Could not process this operation: more details- " << + e.what()<< endl;
+			cout << "Could not process this operation: more details- " << +e.what() << endl;
 		}
-	}
-
-	order createOrderObj(vector<string> orderPars)
-	{
-		ordername oName;
-		ordertype oType;
-		int quantity;
-		int price;
-		string orderId;
-
-		if (orderPars[0] == "BUY") oName = BUY;
-		else  oName = SELL;
-
-		if (orderPars[1] == "GFD") oType = GFD;
-		else  oType = IOC;
-
-		quantity = stoi(orderPars[2]);
-		price = stoi(orderPars[3]);
-
-		orderId = orderPars[4];
-
-		order obj(orderId, oName, oType, quantity, price);
-		return obj;
 	}
 
 	void makeEntryToOrderBook(order &o)
@@ -454,10 +513,10 @@ private:
 
 	void modifyOrder(vector<string> inputMembers)
 	{
-		
+
 		order *o1 = oBook.getOrderbyId(inputMembers[1]);
-		order o2= *o1;
-		
+		order o2 = *o1;
+
 		if (inputMembers[2] == "BUY") o2.setOrderName(BUY);
 		else  o2.setOrderName(SELL);
 
@@ -474,6 +533,29 @@ private:
 		oBook.printOrderBook();
 	}
 
+	order createOrderObj(vector<string> orderPars)
+	{
+		ordername oName;
+		ordertype oType;
+		int quantity;
+		int price;
+		string orderId;
+
+		if (orderPars[0] == "BUY") oName = BUY;
+		else  oName = SELL;
+
+		if (orderPars[1] == "GFD") oType = GFD;
+		else  oType = IOC;
+
+		price = stoi(orderPars[2]);
+		quantity = stoi(orderPars[3]);
+
+		orderId = orderPars[4];
+
+		order obj(orderId, oName, oType, quantity, price);
+		return obj;
+	}
+
 	vector<string> split(string str, char delimiter) {
 		vector<string> strvec;
 		stringstream ss(str);
@@ -486,12 +568,21 @@ private:
 		return strvec;
 	}
 
+	void trim(string& s)
+	{
+		size_t p = s.find_first_not_of(" \t");
+		s.erase(0, p);
+
+		p = s.find_last_not_of(" \t");
+		if (string::npos != p)
+			s.erase(p + 1);
+	}
+
 };
 
-int main()
-{
+int main() {
+
 	TradeEngine t;
 	t.process();
-
 	return 0;
 }
